@@ -12,45 +12,33 @@ def decrypt(ciphertext, private_key):
     P = private_key['P']
     goppa_code = private_key['goppa_code']
     
-    # 1. c' = c * P^-1
-    # Since P is a permutation matrix, P^-1 = P^T
+    # remove the permutation by multiplying with P^-1
     P_inv = P.T
     c_prime = matrix_multiply_gf2(ciphertext.reshape(1, -1), P_inv).flatten()
-    
-    # 2. Decode c' using Goppa decoder to find m'
-    # The decoder returns the corrected codeword (m' * G).
-    # Wait, the decode method returns the corrected vector m' * G.
-    # To find m', we can just take the systematic part of G if it was systematic, 
-    # but since G might not be systematically formatted in this exact step,
-    # we can solve m' * G = corrected_codeword.
-    # Actually, G = [R^T | I] if we look at our generator construction, so the last k columns are I.
-    # Let's extract m' by solving the linear system. Since G is full rank, we can pick k independent columns.
-    
+
+    # 2. Use the Goppa code's decoding algorithm to remove the error added during encryption . 
+   
     corrected_codeword = goppa_code.decode(c_prime)
     
-    # Solve m_prime * G = corrected_codeword
-    # We find k linearly independent columns in G over GF(2)
+    
     k, n = goppa_code.G.shape
     
-    # Try the last k columns first since our construction puts I there
+    # try to find G as if it were systematic
+    
     cols = list(range(n-k, n))
+
     try:
         G_sub = goppa_code.G[:, cols]
         G_sub_inv = invert_matrix_gf2(G_sub)
     except ValueError:
-        # Fallback to finding any k independent columns over GF(2)
+       
         cols = []
         for i in range(n):
             cols.append(i)
-            # Check if current set of columns has full rank by trying to invert the square submatrix
-            # If not square yet, we just assume they might be independent and keep adding
-            # A better way is to do Gaussian elimination, but for small k, this try-except when len == k works.
-            # Actually, to be robust, we need to ensure the columns form a basis.
-            # Let's just use the systematic_form_gf2 tool we have!
+         
             pass
             
-        # A simpler fallback: just iterate all combinations? No, k is small.
-        # But we know G has full rank k. So we can just do RREF on G and find pivot columns!
+      # if the G not systematic .
         from gf_arithmetic import rref_gf2
         rref_G = rref_gf2(goppa_code.G)
         cols = []
